@@ -45,8 +45,10 @@ def dump_synonims(synonims, output_name):
 
 
 def make_synonims(INPUT_NAME, OUTPUT_NAME):
+    print 'Making synonims...'
     synonims = get_synonims(INPUT_NAME)
     dump_synonims(synonims, OUTPUT_NAME)
+    print 'Synonims saved in ' + OUTPUT_NAME 
 
 if __name__ == '__main__':
     make_synonims(INPUT_NAME, OUTPUT_NAME)    
