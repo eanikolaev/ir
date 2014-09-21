@@ -3,17 +3,52 @@ from pyparsing import infixNotation, opAssoc, Keyword, Word, alphas
 import pickle
 from nltk.stem.snowball import RussianStemmer
 from make_iindex import make_iindex
+from make_synonims import make_synonims
 import os, sys
 
-KARENINA_NAME = 'karenina.htm'
-IINDEX_NAME = 'iindex.pkl'
+KARENINA_NAME   = 'karenina.htm'
+IINDEX_NAME     = 'iindex.pkl'
 PARAGRAPHS_NAME = 'paragraphs.pkl'
+SYNONIMS_INPUT  = 'synonims.txt'
+SYNONIMS_OUTPUT = 'synonims.pkl'
+
+
+def OR(docs1, docs2):
+    res = []
+    i = 0
+    j = 0
+    n = len(docs1)
+    m = len(docs2)
+    while i<n and j<m:
+        if docs1[i] < docs2[j]:
+            res.append(docs1[i])
+            i += 1
+        elif docs1[i] > docs2[j]:
+            res.append(docs2[j])
+            j += 1
+        else:
+            i += 1
+    
+    while i<n:
+        res.append(docs1[i])
+        i += 1
+
+    while j<m:
+        res.append(docs2[j])
+        j += 1
+  	
+    return res
+
 
 class BoolOperand(object):    
     def __init__(self,t):
-        global STEMMER, IINDEX
-        term = STEMMER.stem(t[0])    
+        global STEMMER, IINDEX, SYNONIMS
+        term = STEMMER.stem(t[0])       
         self.value = IINDEX.get(term, [])
+
+        for synonim in SYNONIMS.get(term, []):
+            synonim_term = STEMMER.stem(synonim)            
+            self.value = OR(self.value, IINDEX.get(synonim_term,[]))
 
     def calcop(self):
         return self.value
@@ -50,31 +85,7 @@ class BoolAnd(BoolBinOp):
 
 class BoolOr(BoolBinOp):
     def calc(self, docs1, docs2):
-	res = []
-	i = 0
-	j = 0
-	n = len(docs1)
-	m = len(docs2)
-	while i<n and j<m:
-	    if docs1[i] < docs2[j]:
-	        res.append(docs1[i])
-	        i += 1
-	    elif docs1[i] > docs2[j]:
-	        res.append(docs2[j])
-	        j += 1
-	    else:
-	        i += 1
-
-	while i<n:
-	    res.append(docs1[i])
-	    i += 1
-
-	while j<m:
-	    res.append(docs2[j])
-	    j += 1
-	    	
-	return res
-
+        return OR(docs1, docs2)
 
 class BoolNot(object):
     def __init__(self,t):
@@ -109,6 +120,7 @@ def eval_query(query_str):
 
 def init():
     global IINDEX, WORD_CHARS, ALL_DOC_IDS, STEMMER
+    read_synonims()
     inp = open(IINDEX_NAME, 'rb')
     IINDEX = pickle.load(inp)
     m = 0
@@ -121,6 +133,13 @@ def init():
     ALL_DOC_IDS = [ i for i in xrange(1,m+1) ]
     STEMMER = RussianStemmer()
     WORD_CHARS = u'abcdefghijklmnopqrstuvwxyzабвгдеёжзийклмнопрстуфхцчшщьыъэюя'
+
+
+def read_synonims():
+    global SYNONIMS
+    inp = open(SYNONIMS_OUTPUT, 'rb')
+    SYNONIMS = pickle.load(inp)
+    inp.close()
 
 
 def read_paragraphs():
@@ -140,9 +159,12 @@ if __name__ == '__main__':
     if not (PARAGRAPHS_NAME in filenames and IINDEX_NAME in filenames):
         make_iindex(KARENINA_NAME, IINDEX_NAME, PARAGRAPHS_NAME)
 
+    if not (SYNONIMS_OUTPUT in filenames):
+        make_synonims(SYNONIMS_INPUT, SYNONIMS_OUTPUT)
+
     init()
     paragraphs = read_paragraphs()
+
     paragraph_nums = eval_query(query)    
     for num in paragraph_nums:
         print num, paragraphs[num-1]
-
